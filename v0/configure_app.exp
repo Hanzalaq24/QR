@@ -1,0 +1,64 @@
+#!/usr/bin/expect -f
+
+set timeout 1200
+set host "72.61.229.171"
+set user "root"
+set password ")vbofQi/lHXSMqF?Nk8E"
+set app_dir "/var/www/qr.akmal.in"
+
+spawn ssh -o StrictHostKeyChecking=no $user@$host
+
+expect {
+    "password:" {
+        send "$password\r"
+    }
+}
+expect "#"
+
+# 1. Backend Setup
+send "cd $app_dir/backend\r"
+expect "#"
+send "python3 -m venv venv\r"
+expect "#"
+send "source venv/bin/activate\r"
+expect "#"
+# Upgrade pip just in case
+send "pip install --upgrade pip\r"
+expect "#"
+# Install requirements
+send "pip install -r requirements.txt\r"
+expect "#"
+# Create .env for backend
+send "echo 'GEMINI_API_KEY=AIzaSyCYoV0lIyz2KBS4IsQ0H9_usvf9dPGAKUM' > .env\r"
+expect "#"
+
+# 2. Frontend Setup
+send "cd $app_dir\r"
+expect "#"
+send "npm install\r"
+expect "#"
+# Build with environment variable
+send "NEXT_PUBLIC_BASE_URL=https://qr.akmal.in npm run build\r"
+expect "#"
+
+# 3. PM2 Setup
+# Backend
+send "pm2 delete qr-backend || true\r"
+expect "#"
+send "pm2 start backend/main.py --name \"qr-backend\" --interpreter ./backend/venv/bin/python\r"
+expect "#"
+
+# Frontend
+send "pm2 delete qr-frontend || true\r"
+expect "#"
+send "pm2 start npm --name \"qr-frontend\" -- start -- -p 3000\r"
+expect "#"
+
+send "pm2 save\r"
+expect "#"
+send "pm2 startup\r"
+expect "#"
+
+send "exit\r"
+expect eof
+exit 0
